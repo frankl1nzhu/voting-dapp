@@ -23,7 +23,7 @@ import Voting from './artifacts/contracts/Voting.sol/Voting.json';
 
 // For local testing: const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 // After deploying to Sepolia, replace with your deployed contract address:
-const contractAddress = "0x1a36A15402358a492c57F31358276f301Dd1E7cc"; 
+const contractAddress = "0xeCEC5ce92694741Fee8924D3c3Db50E0dfcd249d"; 
 
 function App() {
   const [account, setAccount] = useState('');
@@ -42,6 +42,7 @@ function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
+  const [canResetVoting, setCanResetVoting] = useState(false);
 
   const connectWallet = async () => {
     try {
@@ -90,6 +91,13 @@ function App() {
       const status = await contract.workflowStatus();
       console.log("Workflow status:", status);
       setWorkflowStatus(Number(status));
+      
+      // Check if we can reset the voting process
+      if (Number(status) === 5) { // VotesTallied
+        setCanResetVoting(true);
+      } else {
+        setCanResetVoting(false);
+      }
       
       // Load proposals
       const proposalCount = await contract.getProposalsCount();
@@ -236,6 +244,26 @@ function App() {
       await loadContractData(contract);
     } catch (error) {
       setError('Error tallying votes: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetVoting = async () => {
+    try {
+      setLoading(true);
+      // Reset the contract to RegisteringVoters state
+      // This requires adding a resetVoting function to the smart contract
+      const tx = await contract.resetVoting();
+      await tx.wait();
+      setSuccess('Voting process reset successfully! Ready for a new voting session.');
+      
+      // Reset local state
+      setProposals([]);
+      setWinner(null);
+      await loadContractData(contract);
+    } catch (error) {
+      setError('Error resetting voting process: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -394,6 +422,18 @@ function App() {
                             Tally Votes
                           </Button>
                         )}
+
+                        {workflowStatus === 5 && canResetVoting && (
+                          <Button
+                            variant="contained"
+                            onClick={resetVoting}
+                            fullWidth
+                            color="secondary"
+                            sx={{ mt: 2 }}
+                          >
+                            Reset Voting Process
+                          </Button>
+                        )}
                       </>
                     ) : (
                       <Typography variant="body1" color="text.secondary">
@@ -443,9 +483,11 @@ function App() {
                           </>
                         )}
 
-                        {workflowStatus === 3 && !hasVoted && (
+                        {workflowStatus === 3 && (
                           <Typography variant="body1" gutterBottom>
-                            Select a proposal from the list below to vote
+                            {hasVoted 
+                              ? "You have already voted"
+                              : "Select a proposal from the list below to vote"}
                           </Typography>
                         )}
                       </>

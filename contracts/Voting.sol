@@ -35,6 +35,7 @@ contract Voting is Ownable {
     WorkflowStatus public workflowStatus;
     Proposal[] public proposals;
     mapping(address => Voter) public voters;
+    address[] public voterAddresses; // Array to keep track of registered voter addresses
     uint public winningProposalId;
 
     // Events
@@ -80,6 +81,7 @@ contract Voting is Ownable {
         require(!voters[_voter].isRegistered, "Voter is already registered");
 
         voters[_voter].isRegistered = true;
+        voterAddresses.push(_voter); // Add to the voter addresses array
 
         emit VoterRegistered(_voter);
     }
@@ -97,6 +99,7 @@ contract Voting is Ownable {
         for (uint i = 0; i < _voters.length; i++) {
             if (!voters[_voters[i]].isRegistered) {
                 voters[_voters[i]].isRegistered = true;
+                voterAddresses.push(_voters[i]); // Add to the voter addresses array
                 emit VoterRegistered(_voters[i]);
             }
         }
@@ -114,6 +117,16 @@ contract Voting is Ownable {
         require(voters[_voter].isRegistered, "Voter is not registered");
 
         voters[_voter].isRegistered = false;
+
+        // Remove from the voter addresses array
+        for (uint i = 0; i < voterAddresses.length; i++) {
+            if (voterAddresses[i] == _voter) {
+                // Replace with the last element and then pop
+                voterAddresses[i] = voterAddresses[voterAddresses.length - 1];
+                voterAddresses.pop();
+                break;
+            }
+        }
 
         emit VoterUnregistered(_voter);
     }
@@ -274,6 +287,39 @@ contract Voting is Ownable {
         emit WorkflowStatusChange(
             WorkflowStatus.VotingSessionEnded,
             WorkflowStatus.VotesTallied
+        );
+    }
+
+    /**
+     * @dev Reset the voting process to start a new voting session
+     * Can only be called by the owner and only after votes have been tallied
+     */
+    function resetVoting() external onlyOwner {
+        require(
+            workflowStatus == WorkflowStatus.VotesTallied,
+            "Current voting session is not completed"
+        );
+
+        // Reset workflow status
+        workflowStatus = WorkflowStatus.RegisteringVoters;
+
+        // Clear proposals array
+        delete proposals;
+
+        // Reset winning proposal
+        winningProposalId = 0;
+
+        // Reset all voter's voting status but keep their registration status
+        for (uint i = 0; i < voterAddresses.length; i++) {
+            if (voters[voterAddresses[i]].isRegistered) {
+                voters[voterAddresses[i]].hasVoted = false;
+                voters[voterAddresses[i]].votedProposalId = 0;
+            }
+        }
+
+        emit WorkflowStatusChange(
+            WorkflowStatus.VotesTallied,
+            WorkflowStatus.RegisteringVoters
         );
     }
 

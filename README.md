@@ -6,7 +6,7 @@ A decentralized voting application built with Solidity and React that allows for
 
 Yuzhe Zhu
 
-## 🌟 Features
+## Features
 
 - **Secure Voter Registration**: Only the admin can register voters with a whitelist system
 - **Transparent Proposal Submission**: Registered voters can submit proposals during the proposal phase
@@ -18,7 +18,7 @@ Yuzhe Zhu
   - Batch registration of multiple voters
   - Comprehensive workflow management
 
-## 🔧 Technology Stack
+## Technology Stack
 
 - **Smart Contract**: Solidity 0.8.20
 - **Blockchain Development**: Hardhat
@@ -26,7 +26,7 @@ Yuzhe Zhu
 - **Web3 Integration**: ethers.js
 - **Testing**: Hardhat test suite with Chai
 
-## 📋 Smart Contract Workflow
+## Smart Contract Workflow
 
 The voting process follows a strict workflow:
 
@@ -50,7 +50,7 @@ The voting process follows a strict workflow:
    - The proposal with the most votes wins
    - Results are displayed to all users
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -98,7 +98,7 @@ const contractAddress = "YOUR_DEPLOYED_CONTRACT_ADDRESS";
 npm start
 ```
 
-## 📱 Usage
+## Usage
 
 ### As Administrator
 
@@ -119,7 +119,7 @@ npm start
 3. Vote for your preferred proposal during the voting phase
 4. View the final results after voting ends
 
-## 🧪 Testing
+## Testing
 
 The project includes a comprehensive test suite for the smart contract:
 
@@ -127,7 +127,7 @@ The project includes a comprehensive test suite for the smart contract:
 npx hardhat test
 ```
 
-## 🔒 Security Considerations
+## Security Considerations
 
 - The admin has control over the voting process workflow
 - All votes are transparent and can be seen by everyone
