@@ -78,6 +78,7 @@ npm install
 ```
 SEPOLIA_URL=https://sepolia.infura.io/v3/YOUR_INFURA_KEY
 PRIVATE_KEY=your_private_key_without_0x_prefix
+REACT_APP_CONTRACT_ADDRESS=your_deployed_contract_address
 ```
 
 4. Deploy the smart contract (for testing on Sepolia):
@@ -86,17 +87,31 @@ PRIVATE_KEY=your_private_key_without_0x_prefix
 npx hardhat run scripts/deploy.js --network sepolia
 ```
 
-5. Update the contract address in `src/App.js`:
-
-```javascript
-const contractAddress = "YOUR_DEPLOYED_CONTRACT_ADDRESS";
-```
+5. Update the contract address in `.env` file with your deployed contract address.
 
 6. Start the application:
 
 ```bash
 npm start
 ```
+
+## Deployment
+
+### Deploying to Vercel
+
+1. Fork this repository to your GitHub account
+2. Go to [Vercel](https://vercel.com) and create a new project
+3. Import your forked repository
+4. Add the following environment variable in Vercel project settings:
+   - `REACT_APP_CONTRACT_ADDRESS`: Your deployed smart contract address
+
+### Environment Variables
+
+The following environment variables are required:
+
+- `REACT_APP_CONTRACT_ADDRESS`: The address of your deployed smart contract
+- `SEPOLIA_URL`: (Optional) Your Infura URL for Sepolia network
+- `PRIVATE_KEY`: (Optional) Your private key for contract deployment
 
 ## Usage
 

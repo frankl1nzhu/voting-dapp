@@ -23,7 +23,7 @@ import Voting from './artifacts/contracts/Voting.sol/Voting.json';
 
 // For local testing: const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 // After deploying to Sepolia, replace with your deployed contract address:
-const contractAddress = "0xa7b0147b77f877D169740E048Ef95A5a19159a6D"; 
+const contractAddress = process.env.REACT_APP_CONTRACT_ADDRESS || "0xa39aE4e250Cb88d2fB289678cf6c9F63b60578d7"; 
 
 function App() {
   const [account, setAccount] = useState('');
