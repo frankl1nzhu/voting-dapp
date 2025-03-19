@@ -23,7 +23,7 @@ import Voting from './artifacts/contracts/Voting.sol/Voting.json';
 
 // For local testing: const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 // After deploying to Sepolia, replace with your deployed contract address:
-const contractAddress = "0xeCEC5ce92694741Fee8924D3c3Db50E0dfcd249d"; 
+const contractAddress = "0xa7b0147b77f877D169740E048Ef95A5a19159a6D"; 
 
 function App() {
   const [account, setAccount] = useState('');
@@ -43,6 +43,8 @@ function App() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [hasVoted, setHasVoted] = useState(false);
   const [canResetVoting, setCanResetVoting] = useState(false);
+  const [votersList, setVotersList] = useState([]);
+  const [showVoters, setShowVoters] = useState(false);
 
   const connectWallet = async () => {
     try {
@@ -72,8 +74,13 @@ function App() {
     try {
       setLoading(true);
       setError(''); // 清除之前的错误
+      setSuccess(''); // 清除之前的成功消息
       
-      console.log("Loading contract data...");
+      // 重置voter状态
+      setIsRegistered(false);
+      setHasVoted(false);
+      
+      console.log("Loading contract data for account:", account);
       
       // 检查当前账户是否已注册为选民
       if (account) {
@@ -81,7 +88,7 @@ function App() {
           const voterInfo = await contract.getVoter(account);
           setIsRegistered(voterInfo.isRegistered);
           setHasVoted(voterInfo.hasVoted);
-          console.log("Voter info:", voterInfo);
+          console.log("Voter info for current account:", voterInfo);
         } catch (e) {
           console.log("Error getting voter info:", e);
         }
@@ -125,6 +132,41 @@ function App() {
           description: winnerData.description,
           voteCount: Number(winnerData.voteCount)
         });
+      }
+      
+      // For admin only: load voter addresses
+      if (isAdmin) {
+        try {
+          let votersData = [];
+          let i = 0;
+          let addressesFound = true;
+          
+          // Since we don't have a direct way to get array length on contracts, try to read elements
+          // until we get an error (out of bounds)
+          while (addressesFound) {
+            try {
+              const address = await contract.voterAddresses(i);
+              const voterInfo = await contract.getVoter(address);
+              votersData.push({
+                address,
+                isRegistered: voterInfo.isRegistered,
+                hasVoted: voterInfo.hasVoted,
+                votedProposalId: Number(voterInfo.votedProposalId)
+              });
+              i++;
+            } catch (e) {
+              // We've reached the end of the array
+              addressesFound = false;
+              console.log(`Found ${i} voter addresses`);
+            }
+          }
+          
+          setVotersList(votersData);
+          console.log("Voters loaded:", votersData);
+        } catch (e) {
+          console.error("Error loading voters:", e);
+          // Non-critical error - don't affect UI
+        }
       }
       
       setLoading(false);
@@ -212,7 +254,21 @@ function App() {
       setLoading(true);
       const tx = await contract.vote(proposalId);
       await tx.wait();
-      setSuccess('Vote cast successfully!');
+      
+      // Immediately update the local state to show that the user has voted
+      setHasVoted(true);
+      
+      // Find the proposal and update its vote count locally
+      const updatedProposals = [...proposals];
+      const proposalIndex = updatedProposals.findIndex(p => p.id === proposalId);
+      if (proposalIndex !== -1) {
+        updatedProposals[proposalIndex].voteCount += 1;
+        setProposals(updatedProposals);
+      }
+      
+      setSuccess(`Your vote for "${proposals[proposalId].description}" has been recorded successfully!`);
+      
+      // Refresh contract data to get latest state
       await loadContractData(contract);
     } catch (error) {
       setError('Error casting vote: ' + error.message);
@@ -276,9 +332,29 @@ function App() {
 
   const handleVoteConfirm = async () => {
     if (selectedProposal) {
-      await vote(selectedProposal.id);
-      setOpenDialog(false);
-      setSelectedProposal(null);
+      // 再次检查用户是否有资格投票
+      try {
+        const voterInfo = await contract.getVoter(account);
+        if (!voterInfo.isRegistered) {
+          setError("You are not registered as a voter");
+          setOpenDialog(false);
+          return;
+        }
+        
+        if (voterInfo.hasVoted) {
+          setError("You have already voted");
+          setOpenDialog(false);
+          return;
+        }
+        
+        // 继续执行投票
+        await vote(selectedProposal.id);
+        setOpenDialog(false);
+        setSelectedProposal(null);
+      } catch (error) {
+        setError("Error checking voter status: " + error.message);
+        setOpenDialog(false);
+      }
     }
   };
 
@@ -287,6 +363,55 @@ function App() {
       loadContractData(contract);
     }
   }, [contract]);
+
+  // 添加账户变更监听
+  useEffect(() => {
+    if (window.ethereum) {
+      // 监听账户变更事件
+      const handleAccountsChanged = async (accounts) => {
+        console.log("Account changed to:", accounts[0]);
+        if (accounts.length > 0) {
+          setAccount(accounts[0]);
+          
+          // 重新连接合约
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const votingContract = new ethers.Contract(contractAddress, Voting.abi, signer);
+          setContract(votingContract);
+          
+          // 检查新账户是否是管理员
+          const owner = await votingContract.owner();
+          setIsAdmin(owner.toLowerCase() === accounts[0].toLowerCase());
+          
+          // 重新加载合约数据
+          await loadContractData(votingContract);
+        } else {
+          // 如果用户断开连接，清除状态
+          setAccount('');
+          setContract(null);
+          setIsAdmin(false);
+          setIsRegistered(false);
+          setHasVoted(false);
+        }
+      };
+
+      // 监听链ID变更事件
+      const handleChainChanged = () => {
+        // 刷新页面以确保一切都是最新的
+        window.location.reload();
+      };
+
+      // 添加事件监听器
+      window.ethereum.on('accountsChanged', handleAccountsChanged);
+      window.ethereum.on('chainChanged', handleChainChanged);
+
+      // 清理函数：移除事件监听器
+      return () => {
+        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      };
+    }
+  }, []);
 
   return (
     <Container maxWidth="lg">
@@ -311,9 +436,36 @@ function App() {
               Connected Account: {account}
             </Typography>
             
-            <Typography variant="subtitle1" gutterBottom color={isAdmin ? "primary" : "text.secondary"}>
-              {isAdmin ? "You are the admin" : "You are not the admin"}
-            </Typography>
+            <Box sx={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              p: 2, 
+              mb: 2, 
+              border: '1px solid', 
+              borderColor: 'divider',
+              borderRadius: 1,
+              bgcolor: 'background.paper'
+            }}>
+              <Typography variant="h6" gutterBottom color={isAdmin ? "primary" : "text.secondary"}>
+                {isAdmin ? "👑 ADMIN ACCOUNT" : "👤 VOTER ACCOUNT"}
+              </Typography>
+              
+              <Typography variant="body2">
+                Address: <Box component="span" sx={{ fontFamily: 'monospace' }}>{account}</Box>
+              </Typography>
+              
+              {isRegistered && (
+                <Typography variant="body2" color="success.main">
+                  ✅ Registered Voter {hasVoted && " • Already Voted"}
+                </Typography>
+              )}
+              
+              {!isRegistered && !isAdmin && (
+                <Typography variant="body2" color="error">
+                  ❌ Not Registered as Voter
+                </Typography>
+              )}
+            </Box>
 
             <Typography variant="subtitle1" gutterBottom>
               Current Status: {
@@ -434,6 +586,60 @@ function App() {
                             Reset Voting Process
                           </Button>
                         )}
+
+                        {isAdmin && (
+                          <Box sx={{ mt: 2 }}>
+                            <Button
+                              variant="outlined"
+                              onClick={() => setShowVoters(!showVoters)}
+                              fullWidth
+                            >
+                              {showVoters ? "Hide Voters Status" : "Show Voters Status"}
+                            </Button>
+                            
+                            {showVoters && (
+                              <Card sx={{ mt: 2, maxHeight: 300, overflow: 'auto' }}>
+                                <CardContent>
+                                  <Typography variant="h6" gutterBottom>
+                                    Voters Status
+                                  </Typography>
+                                  {votersList.length === 0 ? (
+                                    <Typography variant="body2">No voters registered</Typography>
+                                  ) : (
+                                    <List dense>
+                                      {votersList.map((voter, index) => (
+                                        <ListItem key={index}>
+                                          <ListItemText
+                                            primary={`${voter.address.substring(0, 8)}...${voter.address.substring(36)}`}
+                                            secondary={
+                                              <>
+                                                <Typography variant="caption" component="span" color={voter.isRegistered ? "success.main" : "error"}>
+                                                  {voter.isRegistered ? "Registered" : "Not Registered"}
+                                                </Typography>
+                                                {" • "}
+                                                <Typography variant="caption" component="span" color={voter.hasVoted ? "info.main" : "text.secondary"}>
+                                                  {voter.hasVoted ? "Has Voted" : "Has Not Voted"}
+                                                </Typography>
+                                                {voter.hasVoted && (
+                                                  <>
+                                                    {" • "}
+                                                    <Typography variant="caption" component="span">
+                                                      Voted for Proposal {voter.votedProposalId}
+                                                    </Typography>
+                                                  </>
+                                                )}
+                                              </>
+                                            }
+                                          />
+                                        </ListItem>
+                                      ))}
+                                    </List>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            )}
+                          </Box>
+                        )}
                       </>
                     ) : (
                       <Typography variant="body1" color="text.secondary">
@@ -458,10 +664,10 @@ function App() {
                           You are a registered voter
                         </Typography>
                         
-                        {hasVoted && (
-                          <Typography variant="body2" color="info.main" gutterBottom>
-                            You have already voted
-                          </Typography>
+                        {workflowStatus === 3 && hasVoted && (
+                          <Alert severity="info" sx={{ mb: 2 }}>
+                            You have already voted. You cannot vote again in this session.
+                          </Alert>
                         )}
 
                         {workflowStatus === 1 && (
@@ -486,14 +692,14 @@ function App() {
                         {workflowStatus === 3 && (
                           <Typography variant="body1" gutterBottom>
                             {hasVoted 
-                              ? "You have already voted"
+                              ? "Your vote has been recorded. Thank you for participating!"
                               : "Select a proposal from the list below to vote"}
                           </Typography>
                         )}
                       </>
                     ) : (
                       <Typography variant="body1" color="text.secondary">
-                        You are not registered as a voter. Contact the admin to get registered.
+                        You are not registered as a voter.
                       </Typography>
                     )}
                   </CardContent>
@@ -520,11 +726,21 @@ function App() {
                               '&:hover': {
                                 bgcolor: workflowStatus === 3 && isRegistered && !hasVoted ? 'action.selected' : 'transparent',
                               },
+                              opacity: workflowStatus === 3 && isRegistered && !hasVoted ? 1 : 0.7,
                             }}
                           >
                             <ListItemText
                               primary={proposal.description || "Abstention"}
-                              secondary={`Votes: ${proposal.voteCount}`}
+                              secondary={
+                                <>
+                                  {`Votes: ${proposal.voteCount}`}
+                                  {workflowStatus === 3 && isRegistered && hasVoted && 
+                                    <Typography variant="caption" component="div" color="error">
+                                      You have already voted
+                                    </Typography>
+                                  }
+                                </>
+                              }
                             />
                           </ListItem>
                         ))}
@@ -553,9 +769,17 @@ function App() {
                       <Typography variant="body1">
                         Proposal: {winner.description || "Abstention"}
                       </Typography>
-                      <Typography variant="body1">
+                      <Typography variant="body1" gutterBottom>
                         Vote Count: {winner.voteCount}
                       </Typography>
+                      
+                      {isRegistered && (
+                        <Alert severity={hasVoted ? "success" : "info"} sx={{ mt: 2 }}>
+                          {hasVoted 
+                            ? "Thank you for participating in this vote!" 
+                            : "You did not participate in this vote."}
+                        </Alert>
+                      )}
                     </CardContent>
                   </Card>
                 </Grid>
@@ -566,8 +790,11 @@ function App() {
             <Dialog open={openDialog} onClose={() => setOpenDialog(false)}>
               <DialogTitle>Confirm Vote</DialogTitle>
               <DialogContent>
-                <Typography>
+                <Typography gutterBottom>
                   Are you sure you want to vote for "{selectedProposal?.description || "Abstention"}"?
+                </Typography>
+                <Typography variant="body2" color="error">
+                  Note: You can only vote once during this voting session. This action cannot be undone.
                 </Typography>
               </DialogContent>
               <DialogActions>
