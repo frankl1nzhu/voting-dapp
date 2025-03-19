@@ -6,6 +6,28 @@ A decentralized voting application built with Solidity and React that allows for
 
 Yuzhe Zhu
 
+## Deployment
+
+Site : https://voting-dapp-d1a35lnuc-frankl1nzhus-projects.vercel.app/
+
+Video : https://www.youtube.com/watch?v=GEKXzn9UxkQ
+
+## Deploying to Vercel
+
+1. Fork this repository to your GitHub account
+2. Go to [Vercel](https://vercel.com) and create a new project
+3. Import your forked repository
+4. Add the following environment variable in Vercel project settings:
+   - `REACT_APP_CONTRACT_ADDRESS`: Your deployed smart contract address
+
+### Environment Variables
+
+The following environment variables are required:
+
+- `REACT_APP_CONTRACT_ADDRESS`: The address of your deployed smart contract
+- `SEPOLIA_URL`: Your Infura URL for Sepolia network
+- `PRIVATE_KEY`: Your private key for contract deployment
+
 ## Features
 
 - **Secure Voter Registration**: Only the admin can register voters with a whitelist system
@@ -88,30 +110,11 @@ npx hardhat run scripts/deploy.js --network sepolia
 ```
 
 5. Update the contract address in `.env` file with your deployed contract address.
-
 6. Start the application:
 
 ```bash
 npm start
 ```
-
-## Deployment
-
-### Deploying to Vercel
-
-1. Fork this repository to your GitHub account
-2. Go to [Vercel](https://vercel.com) and create a new project
-3. Import your forked repository
-4. Add the following environment variable in Vercel project settings:
-   - `REACT_APP_CONTRACT_ADDRESS`: Your deployed smart contract address
-
-### Environment Variables
-
-The following environment variables are required:
-
-- `REACT_APP_CONTRACT_ADDRESS`: The address of your deployed smart contract
-- `SEPOLIA_URL`: (Optional) Your Infura URL for Sepolia network
-- `PRIVATE_KEY`: (Optional) Your private key for contract deployment
 
 ## Usage
 
